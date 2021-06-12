@@ -1,15 +1,15 @@
 import Head from 'next/head'
-import { useState, useRef, forwardRef } from 'react'
+import { useState, useRef, forwardRef, useEffect } from 'react'
 import DomToImage from 'dom-to-image'
 
 import Form from '../components/form'
 import Gantt from '../components/gantt'
-import { parseDate } from '../utils/utils'
+import { parseJsonDate } from '../utils/utils'
 import { compareAsc } from 'date-fns'
 
 export default function Home() {
-  const [text, setText] = useState(JSON.stringify(sample, null, 4));
-  const [json, setJson] = useState(validateJson(text).json);
+  const [text, setText] = useState();
+  const [json, setJson] = useState();
   const [errors, setErrors] = useState([]);
   const [imageUrl, setImageUrl] = useState();
   const ref = useRef(null);
@@ -22,42 +22,54 @@ export default function Home() {
     }
     setErrors(errors);
   }
+  useEffect(() => {
+    const storedJson = validateJson(localStorage.getItem('json')).json || sample
+    setText(JSON.stringify(storedJson, null, 4))
+    setJson(storedJson)
+  }, [])
+  useEffect(() => {
+    if (json) {
+      localStorage.setItem('json', JSON.stringify(json))
+    }
+  }, [json])
   return (<>
     <Head>
       <title>{json?.project ? `Henry - ${json.project}` : 'Henry'}</title>
     </Head>
-    <div className="m-5">
-      {json.project && <h1 className="text-3xl font-bold my-3">{json.project}</h1>}
-      <div className="overflow-x-scroll">
-        <Gantt json={json} setJson={(updatedJson) => {
-          setText(JSON.stringify(updatedJson, null, 4))
-          setJson(updatedJson)
-        }} ref={ref} />
+    {json &&
+      <div className="m-5">
+        {json.project && <h1 className="text-3xl font-bold my-3">{json.project}</h1>}
+        <div className="overflow-x-scroll">
+          <Gantt json={json} setJson={(updatedJson) => {
+            setText(JSON.stringify(updatedJson, null, 4))
+            setJson(updatedJson)
+          }} ref={ref} />
+        </div>
+        <div>
+          <button className="my-1 bg-gradient-to-r from-pink-300 to-purple-300 hover:from-pink-300 hover:to-purple-400 text-white font-semibold py-1 px-3 border border-gray-200 rounded shadow"
+            onClick={() => {
+              const sorted = [...json.tasks].sort((a, b) => compareAsc(a.start, b.start))
+              const lastId = parseInt(sorted.map(t => t.id).sort()[sorted.length - 1], 10)
+              const tasks = [...sorted,
+              {
+                id: `${lastId + 1}`,
+                title: 'New Task',
+                assign: sorted[sorted.length - 1].assign,
+                start: sorted[sorted.length - 1].start,
+                end: sorted[sorted.length - 1].end,
+              }]
+              setJson({ ...json, tasks: tasks })
+            }}
+          >+</button>
+        </div>
+        <ImageCapture ref={ref} imageUrl={imageUrl} setImageUrl={setImageUrl} />
+        <Form text={text} setText={setText} onChange={onTextChange} />
+        <div className="mt-2">
+          {errors.map((error) => <p key={error} className="text-red-400">{error}</p>)}
+        </div>
+        <p className="text-gray-200">{JSON.stringify(json)}</p>
       </div>
-      <div>
-        <button className="my-1 bg-gradient-to-r from-pink-300 to-purple-300 hover:from-pink-300 hover:to-purple-400 text-white font-semibold py-1 px-3 border border-gray-200 rounded shadow"
-          onClick={() => {
-            const sorted = [...json.tasks].sort((a, b) => compareAsc(a.start, b.start))
-            const lastId = parseInt(sorted.map(t => t.id).sort()[sorted.length - 1], 10)
-            const tasks = [...sorted,
-            {
-              id: `${lastId + 1}`,
-              title: 'New Task',
-              assign: sorted[sorted.length - 1].assign,
-              start: sorted[sorted.length - 1].start,
-              end: sorted[sorted.length - 1].end,
-            }]
-            setJson({ ...json, tasks: tasks })
-          }}
-        >+</button>
-      </div>
-      <ImageCapture ref={ref} imageUrl={imageUrl} setImageUrl={setImageUrl} />
-      <Form text={text} setText={setText} onChange={onTextChange} />
-      <div className="mt-2">
-        {errors.map((error) => <p key={error} className="text-red-400">{error}</p>)}
-      </div>
-      <p>{JSON.stringify(json)}</p>
-    </div>
+    }
   </>
   );
 }
@@ -97,9 +109,9 @@ const validateJson = (text) => {
   try {
     const parsed = JSON.parse(text, (k, v) => {
       if (k === 'start' || k === 'end') {
-        const date = parseDate(v);
+        const date = parseJsonDate(v);
         if (isNaN(date)) {
-          throw SyntaxError("invalid date. please specify as 'yyyy-MM-dd'");
+          throw SyntaxError("invalid date. Please specify as ISO format");
         } else {
           return date;
         }
@@ -143,22 +155,25 @@ const sample = {
       "id": "1",
       "assign": "Server",
       "title": "Awesome API",
-      "start": "2021-05-27",
-      "end": "2021-06-01"
+      "start": parseJsonDate("2021-05-27T15:00:00.000Z"),
+      "end": parseJsonDate("2021-06-01T15:00:00.000Z"),
+      "progress": 80
     },
     {
       "id": "2",
       "assign": "Frontend",
       "title": "Cool Screen",
-      "start": "2021-06-4",
-      "end": "2021-06-09"
+      "start": parseJsonDate("2021-06-04T15:00:00.000Z"),
+      "end": parseJsonDate("2021-06-09T15:00:00.000Z"),
+      "progress": 20
     },
     {
       "id": "3",
       "assign": "Client",
       "title": "Great Component",
-      "start": "2021-05-27",
-      "end": "2021-06-04"
+      "start": parseJsonDate("2021-05-27T15:00:00.000Z"),
+      "end": parseJsonDate("2021-06-04T15:00:00.000Z"),
+      "progress": 0
     }
   ]
 }

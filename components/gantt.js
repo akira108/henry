@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
-import { eachDayOfInterval, format, isSameDay, isToday, compareAsc } from 'date-fns'
+import { eachDayOfInterval, format, isSameDay, isToday, compareAsc, isSaturday, isSunday, differenceInCalendarDays, differenceInBusinessDays } from 'date-fns'
 import { DndProvider, useDrag } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { parseDate, formatDate, validateDate } from '../utils/utils'
@@ -13,10 +13,8 @@ const getDays = (json) => {
     }
     starts.sort(compareAsc);
     ends.sort(compareAsc);
-    console.log(starts);
     return eachDayOfInterval({ start: starts[0], end: ends[ends.length - 1] });
 };
-
 
 const Gantt = forwardRef(({ json, setJson }, ref) => {
     const days = getDays(json);
@@ -27,6 +25,16 @@ const Gantt = forwardRef(({ json, setJson }, ref) => {
             <div className="my-3 grid w-min overflow-y-hidden relative rounded-lg shadow-md" ref={ref}>
                 <Header days={days} />
                 <Divider days={days} />
+                <div>
+                    { /* avoid purge css */}
+                    <span className="bg-red-300" />
+                    <span className="bg-yellow-300" />
+                    <span className="bg-green-300" />
+                    <span className="bg-blue-300 " />
+                    <span className="bg-indigo-300" />
+                    <span className="bg-purple-300" />
+                    <span className="bg-pink-300" />
+                </div>
                 {sorted.map((task, index) => (
                     <Row
                         task={task}
@@ -52,7 +60,7 @@ const Gantt = forwardRef(({ json, setJson }, ref) => {
 
 export default Gantt;
 
-const getTemplateColumns = (days) => `200px 200px 100px 100px repeat(${days.length}, 40px)`;
+const getTemplateColumns = (days) => `200px 200px 100px 100px 50px repeat(${days.length}, 40px)`;
 
 const Header = ({ days }) => (
     <div className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-400 text-white text-opacity-50" style={{
@@ -63,16 +71,17 @@ const Header = ({ days }) => (
         <div className="m-auto">Assign</div>
         <div className="m-auto">Start</div>
         <div className="m-auto">End</div>
+        <div className="m-auto">%</div>
         {days.map((day) => <div key={day} className="grid grid-rows-3 py-2 m-auto">
             <span className="text-center">{format(day, 'MMM')}</span>
-            <span className="text-center">{format(day, 'dd')}</span>
-            <span className="text-center">{format(day, 'eeeee')}</span>
-        </div>)}
-    </div>
+            <span className={`text-center ${isSaturday(day) ? "text-blue-300" : (isSunday(day) ? "text-red-300" : null)}`}>{format(day, 'dd')}</span>
+            <span className={`text-center ${isSaturday(day) ? "text-blue-300" : (isSunday(day) ? "text-red-300" : null)}`}>{format(day, 'eee')}</span>
+        </div >)}
+    </div >
 );
 
 const Divider = ({ days }) => (
-    <div className="absolute w-full h-full" style={{
+    <div className="absolute w-full h-full z-10" style={{
         display: 'grid',
         gridTemplateColumns: getTemplateColumns(days),
     }}>
@@ -80,9 +89,12 @@ const Divider = ({ days }) => (
         <span className="block border-r border-pink-500 opacity-10"></span>
         <span className="block border-r border-pink-500 opacity-10"></span>
         <span className="block border-r border-pink-500 opacity-10"></span>
+        <span className="block border-r border-pink-500 opacity-10"></span>
         {days.map((day) => {
             if (isToday(day)) {
                 return <span key={day} className="block border-r border-pink-500 opacity-10 bg-pink-500"></span>
+            } else if (isSaturday(day) || isSunday(day)) {
+                return <span key={day} className="block border-r border-pink-500 opacity-10 bg-gray-500"></span>
             } else {
                 return <span key={day} className="block border-r border-pink-500 opacity-10"></span>
             }
@@ -100,19 +112,23 @@ const Row = ({ task, days, disabled, setDragging, onEditTask }) => {
             className={`even:bg-gray-50 bg-white`}
             style={{
                 display: 'grid',
-                gridTemplateColumns: `200px 200px 100px 100px repeat(${days.length}, 40px)`,
+                gridTemplateColumns: `200px 200px 100px 100px 50px repeat(${days.length}, 40px)`,
             }}>
-            <div className="m-auto">
-                <TextInput text={task.title} onEdit={(text) => {
-                    onEditTask({ ...task, title: text })
-                }} />
+            <div className="m-auto z-40">
+                <TextInput text={task.title}
+                    key={task.title}
+                    onEdit={(text) => {
+                        onEditTask({ ...task, title: text })
+                    }} />
             </div>
-            <div className="m-auto">
-                <TextInput text={task.assign} onEdit={(text) => {
-                    onEditTask({ ...task, assign: text })
-                }} />
+            <div className="m-auto z-40">
+                <TextInput text={task.assign}
+                    key={task.assign}
+                    onEdit={(text) => {
+                        onEditTask({ ...task, assign: text })
+                    }} />
             </div>
-            <div className="m-auto">
+            <div className="m-auto z-40">
                 <TextInput text={formatDate(task.start)}
                     key={formatDate(task.start)}
                     onEdit={(text) => {
@@ -120,13 +136,20 @@ const Row = ({ task, days, disabled, setDragging, onEditTask }) => {
                     }}
                     validate={validateDate} />
             </div>
-            <div className="m-auto">
+            <div className="m-auto z-40">
                 <TextInput text={formatDate(task.end)}
                     key={formatDate(task.end)}
                     onEdit={(text) => {
                         onEditTask({ ...task, end: parseDate(text) })
                     }}
                     validate={validateDate} />
+            </div>
+            <div className="m-auto z-40">
+                <TextInput text={task.progress}
+                    key={task.progress}
+                    onEdit={(text) => {
+                        onEditTask({ ...task, progress: parseInt(text, 10) })
+                    }} />
             </div>
             <Task task={task} days={days} setDragging={setDragging} onEdit={(text) => {
                 onEditTask({ ...task, title: text })
@@ -192,13 +215,21 @@ const Task = ({ task, days, setDragging }) => {
         }),
     }));
     setDragging(isDragging);
+    const color = getColor(task.assign)
     return (<div
         ref={drag}
-        className={`text-center text-white mx-1 bg-${getColor(task.assign)}-300 cursor-move opacity-${isDragging ? 50 : 100} rounded-full my-2 shadow z-20`}
+        className={`relative text-center text-indigo-900 mx-1 ${color} cursor-move opacity-${isDragging ? 50 : 100} rounded-xl my-2 shadow z-20`}
         style={{
-            gridColumn: `${startIndex + 5}/${endIndex + 6}`,
+            gridColumn: `${startIndex + 6}/${endIndex + 7}`,
         }}>
-        {task.title}
+        <div className="bg-white opacity-50 rounded-xl absolute" style={{
+            width: `${task.progress}%`,
+            height: "100%"
+        }}></div>
+        <div className="flex flex-nowrap items-center">
+            <div className="rounded-full bg-white w-4 h-4 m-1 text-xs flex-shrink-0 text-gray-300">{differenceInBusinessDays(task.end, task.start) + 1}</div>
+            <div className="text-center flex-grow">{task.title}</div>
+        </div>
     </div>)
 };
 
@@ -210,5 +241,5 @@ const hash = (s) => {
     return h ^ h >>> 9
 }
 
-const colors = ['red', 'yellow', 'green', 'blue', 'indigo', 'purple', 'pink'];
+const colors = ['bg-red-300', 'bg-yellow-300', 'bg-green-300', 'bg-blue-300', 'bg-indigo-300', 'bg-purple-300', 'bg-pink-300'];
 const getColor = (assign) => colors[Math.abs(hash(assign)) % colors.length];
