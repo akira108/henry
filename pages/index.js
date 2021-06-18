@@ -49,7 +49,8 @@ export default function Home() {
           <button className="my-1 bg-gradient-to-r from-pink-300 to-purple-300 hover:from-pink-300 hover:to-purple-400 text-white font-semibold py-1 px-3 border border-gray-200 rounded shadow"
             onClick={() => {
               const sorted = [...json.tasks].sort((a, b) => compareAsc(a.start, b.start))
-              const lastId = parseInt(sorted.map(t => t.id).sort()[sorted.length - 1], 10)
+              const sortedById = sorted.map(t => parseInt(t.id, 10)).sort((a, b) => a < b);
+              const lastId = sortedById[0];
               const tasks = [...sorted,
               {
                 id: `${lastId + 1}`,
@@ -57,6 +58,7 @@ export default function Home() {
                 assign: sorted[sorted.length - 1].assign,
                 start: sorted[sorted.length - 1].start,
                 end: sorted[sorted.length - 1].end,
+                progress: 0
               }]
               setJson({ ...json, tasks: tasks })
             }}
@@ -111,7 +113,7 @@ const validateJson = (text) => {
       if (k === 'start' || k === 'end') {
         const date = parseJsonDate(v);
         if (isNaN(date)) {
-          throw SyntaxError("invalid date. Please specify as ISO format");
+          throw SyntaxError(`invalid date. Please specify as ISO format: ${k} ${v}`);
         } else {
           return date;
         }
